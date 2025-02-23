@@ -69,27 +69,14 @@ class FileWatcher(FileSystemEventHandler):
             # Convert event to JSON string
             event_json = json.dumps(event)
             
-            # Push to Redis list and get response
-            list_response = r.rpush("star_citizen_events", event_json)
-            if not list_response:
-                print(f"Warning: Failed to add event to Redis list: {event_type}")
-                return
+            # Push to Redis list
+            if r.rpush("star_citizen_events", event_json):
+                # Only print successful events
+                print(f"[{timestamp}] Event: {event_type} | Player: {self.player_name} | Details: {json.dumps(details)}")
+                self.events_sent += 1
                 
-            self.events_sent += 1
-            # More detailed event logging
-            print(f"[{timestamp}] Event: {event_type} | Player: {self.player_name} | Details: {json.dumps(details)}")
-            
-            # Periodically verify Redis connection
-            if self.events_sent % 10 == 0:
-                list_length = r.llen("star_citizen_events")
-                print(f"Total events in Redis: {list_length}")
-            
-        except redis.RedisError as e:
-            print(f"Redis Error: {str(e)}")
-            print(f"Failed to save event: {event_type}")
-            print(f"Event details: {json.dumps(event, indent=2)}")
         except Exception as e:
-            print(f"Unexpected error saving to Redis: {str(e)}")
+            pass  # Silently handle errors
         
     def send_heartbeat(self):
         self.save_event("heartbeat", {
@@ -103,7 +90,6 @@ class FileWatcher(FileSystemEventHandler):
         
         # Send heartbeat with current UTC time
         if current_time - self.last_heartbeat >= 60:
-            print(f"Sending heartbeat for player {self.player_name}")
             self.send_heartbeat()
             
         self.check_count += 1
@@ -128,6 +114,21 @@ class FileWatcher(FileSystemEventHandler):
                     
                     # Debug print for each line
                     print(f"Processing line: {line[:100]}...")  # Print first 100 chars of line
+                    
+                    # Check for player connection
+                    if "<Expect Incoming Connection>" in line:
+                        try:
+                            nickname = line.split('nickname="')[1].split('"')[0]
+                            session = line.split('session=')[1].split(' ')[0]
+                            player_geid = line.split('playerGEID=')[1].split(' ')[0]
+                            # Use nickname as the player name
+                            self.player_name = nickname
+                            self.save_event("connection", {
+                                "session": session,
+                                "player_geid": player_geid
+                            }, timestamp)
+                        except:
+                            print("Failed to parse connection event")
                     
                     # Check for location updates
                     if f"Player[{self.player_name}]" in line and "Location[" in line:
@@ -240,7 +241,6 @@ def main():
         
         while True:
             try:
-                print("Checking file...")
                 watcher.check_file()  # This now includes heartbeat check
                 time.sleep(10)
             except redis.RedisError as e:
