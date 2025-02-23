@@ -11,7 +11,7 @@ import datetime
 import redis
 
 
-r = redis.Redis.from_url("redis://default:Agl91T4oiFyh9RxiqBFm7DSkPvWy2VAg@redis-16165.c291.ap-southeast-2-1.ec2.redns.redis-cloud.com:16165")
+r = redis.Redis.from_url("redis://")
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
