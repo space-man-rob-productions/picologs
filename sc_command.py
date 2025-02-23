@@ -5,6 +5,8 @@ import os
 import json
 from datetime import datetime
 import sys
+import datetime
+
 
 import redis
 
@@ -56,7 +58,7 @@ class FileWatcher(FileSystemEventHandler):
         
     def save_event(self, event_type, details, timestamp=None):
         if timestamp is None:
-            timestamp = ''
+            timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds')
             
         event = {
             "timestamp": timestamp,
@@ -112,9 +114,13 @@ class FileWatcher(FileSystemEventHandler):
                 for line in new_lines:
                     timestamp = self.get_timestamp_from_line(line)
                     
-                    # Debug print for each line
-                    print(f"Processing line: {line[:100]}...")  # Print first 100 chars of line
-                    
+                    # Check for system quit
+                    if "<SystemQuit>" in line:
+                        self.save_event("quit", {
+                            "status": "offline",
+                            "player": self.player_name
+                        }, timestamp)
+                        
                     # Check for player connection
                     if "<Expect Incoming Connection>" in line:
                         try:
