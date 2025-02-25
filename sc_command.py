@@ -46,19 +46,11 @@ class FileWatcher(FileSystemEventHandler):
             except:
                 pass
         return []
-        
-    def get_timestamp_from_line(self, line):
-        try:
-            # Log format is like: <2024-03-19T12:34:56.789Z>
-            timestamp_str = line[1:24]  # Extract <YYYY-MM-DDThh:mm:ss.sssZ>
-            return timestamp_str
-        except:
-            # Use timezone-aware UTC time
-            return ''
+               
         
     def save_event(self, event_type, details, timestamp=None):
         if timestamp is None:
-            timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds')
+            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             
         event = {
             "timestamp": timestamp,
@@ -73,8 +65,6 @@ class FileWatcher(FileSystemEventHandler):
             
             # Push to Redis list
             if r.rpush("star_citizen_events", event_json):
-                # Only print successful events
-                print(f"[{timestamp}] Event: {event_type} | Player: {self.player_name} | Details: {json.dumps(details)}")
                 self.events_sent += 1
                 
         except Exception as e:
@@ -88,38 +78,32 @@ class FileWatcher(FileSystemEventHandler):
         self.last_heartbeat = time.time()
         
     def check_file(self):
-        current_time = time.time()
-        
-        # Send heartbeat with current UTC time
-        if current_time - self.last_heartbeat >= 60:
-            self.send_heartbeat()
+        self.send_heartbeat()
             
-        self.check_count += 1
         try:
             current_size = os.path.getsize(self.file_path)
             if current_size < self.last_position:
-                print(f"File was truncated, resetting position from {self.last_position} to 0")
+                # print(f"File was truncated, resetting position from {self.last_position} to 0")
                 self.last_position = 0
                 
             if current_size == self.last_position:
                 return
                 
-            print(f"Reading file from position {self.last_position} to {current_size}")
+            # print(f"Reading file from position {self.last_position} to {current_size}")
             with open(self.file_path, 'r', encoding='utf-8', errors='ignore') as file:
                 file.seek(self.last_position)
                 new_lines = file.readlines()
                 self.last_position = file.tell()
                 
-                print(f"Found {len(new_lines)} new lines to process")
+                # print(f"Found {len(new_lines)} new lines to process")
                 for line in new_lines:
-                    timestamp = self.get_timestamp_from_line(line)
                     
                     # Check for system quit
                     if "<SystemQuit>" in line:
                         self.save_event("quit", {
                             "status": "offline",
                             "player": self.player_name
-                        }, timestamp)
+                        })
                         
                     # Check for player connection
                     if "<Expect Incoming Connection>" in line:
@@ -132,14 +116,14 @@ class FileWatcher(FileSystemEventHandler):
                             self.save_event("connection", {
                                 "session": session,
                                 "player_geid": player_geid
-                            }, timestamp)
+                            })
                         except:
                             print("Failed to parse connection event")
                     
                     # Check for location updates
                     if f"Player[{self.player_name}]" in line and "Location[" in line:
                         location = line[line.find("Location["):].split("]")[0] + "]"
-                        self.save_event("location", {"location": location}, timestamp)
+                        self.save_event("location", {"location": location})
                     
                     # Check for deaths
                     if "<Actor Death>" in line and self.player_name in line:
@@ -150,20 +134,20 @@ class FileWatcher(FileSystemEventHandler):
                             
                             if self.player_name == victim:
                                 if victim == killer:
-                                    self.save_event("death", {"type": "self", "cause": damage_type}, timestamp)
+                                    self.save_event("death", {"type": "self", "cause": damage_type})
                                 else:
-                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type}, timestamp)
+                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type})
                             elif self.player_name == killer:
-                                self.save_event("kill", {"victim": victim, "cause": damage_type}, timestamp)
+                                self.save_event("kill", {"victim": victim, "cause": damage_type})
                         except:
-                            self.save_event("death", {"type": "unknown"}, timestamp)
+                            self.save_event("death", {"type": "unknown"})
                     
                     # Check for ship entry
                     if "Entity [" in line and f"m_ownerGEID[{self.player_name}]" in line:
                         try:
                             ship_type = line.split("Entity [")[1].split("]")[0]
                             if ship_type.startswith(("AEGS", "ANVL", "CRUS", "MISC", "RSI")) and "_" in ship_type:
-                                self.save_event("ship_entry", {"ship": ship_type.replace('_', ' ')}, timestamp)
+                                self.save_event("ship_entry", {"ship": ship_type.replace('_', ' ')})
                         except:
                             pass
                             
@@ -248,7 +232,7 @@ def main():
         while True:
             try:
                 watcher.check_file()  # This now includes heartbeat check
-                time.sleep(10)
+                time.sleep(5)
             except redis.RedisError as e:
                 print(f"Redis Error during check: {str(e)}")
                 time.sleep(30)  # Wait longer on Redis error
@@ -260,6 +244,6 @@ def main():
         print(f"\nFile watching stopped. Total events sent: {watcher.events_sent}")
     finally:
         input("Press Enter to exit...")
-
+ 
 if __name__ == "__main__":
     main()
