@@ -17,14 +17,9 @@ class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
         self.file_path = file_path
         self.player_name = self.get_player_name()
-        self.check_count = 0
         self.last_position = self.get_file_size()
-        self.events_sent = 0  # Track number of events sent
-        self.last_heartbeat = 0  # Track last heartbeat time
         print(f"Detected player name: {self.player_name}")
-        
-        # Send initial heartbeat immediately
-        # self.send_heartbeat()
+    
         
         self.events = []  # Keep this as we still use it for tracking
         
@@ -64,8 +59,7 @@ class FileWatcher(FileSystemEventHandler):
             event_json = json.dumps(event)
             
             # Push to Redis list
-            if r.rpush("star_citizen_events", event_json):
-                self.events_sent += 1
+            r.rpush("star_citizen_events", event_json)
                 
         except Exception as e:
             pass  # Silently handle errors
@@ -75,7 +69,6 @@ class FileWatcher(FileSystemEventHandler):
             "status": "online",
             "player": self.player_name
         })
-        self.last_heartbeat = time.time()
         
     def check_file(self):
         self.send_heartbeat()
@@ -241,7 +234,7 @@ def main():
                 time.sleep(10)
                 
     except KeyboardInterrupt:
-        print(f"\nFile watching stopped. Total events sent: {watcher.events_sent}")
+        print(f"\nFile watching stopped.")
     finally:
         input("Press Enter to exit...")
  
