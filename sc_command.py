@@ -3,12 +3,10 @@ from watchdog.events import FileSystemEventHandler
 import time
 import os
 import json
-from datetime import datetime
-import sys
 import datetime
-
-
+import sys
 import redis
+import webbrowser
 
 
 r = redis.Redis.from_url("redis://")
@@ -65,11 +63,12 @@ class FileWatcher(FileSystemEventHandler):
             pass  # Silently handle errors
         
     def send_heartbeat(self):
-        self.save_event("heartbeat", {
-            "status": "online",
-            "player": self.player_name
-        })
-        
+        try:
+            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            r.hset("sc_player_heartbeats", self.player_name, timestamp)
+        except Exception as e:
+            print(f"Error sending heartbeat: {str(e)}")
+            
     def check_file(self):
         self.send_heartbeat()
             
@@ -134,12 +133,23 @@ class FileWatcher(FileSystemEventHandler):
                                 self.save_event("kill", {"victim": victim, "cause": damage_type})
                         except:
                             self.save_event("death", {"type": "unknown"})
-                    
+
+
+                    # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets and 12 chars long:
+                    if "InstancedInterior [" in line and "hangar" in line and "Entity [" in line and len(line.split("Entity [")[1].split("]")[0]) == 12:
+                        try:
+                            hanger_owner = line.split("m_ownerGEID[")[1].split("]")[0]
+                            enter_player = line.split("Entity [")[1].split("]")[0]
+                            self.save_event("hangar_entry", {"ship": "hangar", "owner": hanger_owner, "enter_player": enter_player})
+                        except:
+                            pass
+
+
                     # Check for ship entry
-                    if "Entity [" in line and f"m_ownerGEID[{self.player_name}]" in line:
+                    if "Entity [" in line and f"m_ownerGEID[{self.player_name}]" in line and "OnEntityEnterZone" in line:
                         try:
                             ship_type = line.split("Entity [")[1].split("]")[0]
-                            if ship_type.startswith(("AEGS", "ANVL", "CRUS", "MISC", "RSI")) and "_" in ship_type:
+                            if ship_type.startswith(("AEGS", "ANVL", "CRUS", "MISC", "RSI", "ORIG")) and "_" in ship_type:
                                 self.save_event("ship_entry", {"ship": ship_type.replace('_', ' ')})
                         except:
                             pass
@@ -219,7 +229,7 @@ def main():
         watcher = FileWatcher(file_to_watch)
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
-        print("\nEvents will be sent to Redis")
+        webbrowser.open('https://sc-command-web-b7no.vercel.app')
         print("\nPress Ctrl+C to stop...")
         
         while True:
@@ -235,8 +245,6 @@ def main():
                 
     except KeyboardInterrupt:
         print(f"\nFile watching stopped.")
-    finally:
-        input("Press Enter to exit...")
  
 if __name__ == "__main__":
     main()
