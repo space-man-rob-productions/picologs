@@ -135,22 +135,32 @@ class FileWatcher(FileSystemEventHandler):
                             self.save_event("death", {"type": "unknown"})
 
 
-                    # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets and 12 chars long:
-                    if "InstancedInterior [" in line and "hangar" in line and "Entity [" in line and len(line.split("Entity [")[1].split("]")[0]) == 12:
-                        try:
-                            hanger_owner = line.split("m_ownerGEID[")[1].split("]")[0]
-                            enter_player = line.split("Entity [")[1].split("]")[0]
-                            self.save_event("hangar_entry", {"ship": "hangar", "owner": hanger_owner, "enter_player": enter_player})
-                        except:
-                            pass
-
+                    # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets at least 5 chars long:
+                    # if "InstancedInterior [" in line and "hangar" in line and "Entity [" in line and len(line.split("Entity [")[1].split("]")[0]) > 5:
+                    #     try:
+                    #         hanger_owner = line.split("m_ownerGEID[")[1].split("]")[0]
+                    #         enter_player = line.split("Entity [")[1].split("]")[0]
+                    #         if hanger_owner == self.player_name:
+                    #             self.save_event("hangar_entry", {"ship": "hangar", "owner": hanger_owner, "enter_player": enter_player})
+                    #     except:
+                    #         pass
 
                     # Check for ship entry
                     if "Entity [" in line and f"m_ownerGEID[{self.player_name}]" in line and "OnEntityEnterZone" in line:
                         try:
                             ship_type = line.split("Entity [")[1].split("]")[0]
+                            ship_id = ship_type.split("_")[-1]
                             if ship_type.startswith(("AEGS", "ANVL", "CRUS", "MISC", "RSI", "ORIG")) and "_" in ship_type:
-                                self.save_event("ship_entry", {"ship": ship_type.replace('_', ' ')})
+                                r.hset("star_citizen_fleet:" + ship_id, mapping={ "id": ship_id, "name": ship_type, "owner": self.player_name, "captain": self.player_name})
+                        except:
+                            pass
+
+                    #<Vehicle Destruction> CVehicle::OnAdvanceDestroyLevel: Vehicle 'ORIG_m50_1725883130384'
+                    if "<Vehicle Destruction>" in line and "Vehicle '" in line:
+                        try:
+                            ship_id = line.split("Vehicle '")[1].split("'")[0].split("_")[-1]
+                            self.save_event("ship_destroyed", {"ship": ship_id})
+                            r.delete("star_citizen_fleet:" + ship_id)
                         except:
                             pass
                             
