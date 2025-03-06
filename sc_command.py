@@ -200,21 +200,25 @@ class FileWatcher(FileSystemEventHandler):
             sys.exit(1)  # Exit program on error
 
 def load_config():
-    # Get AppData path
-    app_data_path = os.path.join(os.getenv('APPDATA'), 'SCCommand')
-    config_path = os.path.join(app_data_path, 'game_log_path.txt')
+    # default path
+    # C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log
+    default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log"
+    print(f"Looking for Game.log at: {default_path}")
     
-    # Create directory if it doesn't exist
-    os.makedirs(app_data_path, exist_ok=True)
-    
-    try:
-        with open(config_path, 'r') as f:
-            return f.read().strip()
-    except:
-        print("Error: Game.log path not found!")
-        print("Please reinstall the application")
-        input("Press Enter to exit...")
-        sys.exit(1)
+    if not os.path.exists(default_path):
+        print("Game.log not found at default location")            
+        print("\nPlease enter the full path to your Game.log file:")
+        print("(Example: C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log)")
+        
+        while True:
+            path = input("> ").strip()
+            if os.path.exists(path):
+                return path
+            else:
+                print("\nError: File not found at specified path!")
+                print("Please enter a valid path or press Ctrl+C to exit")
+    else:
+        return default_path
 
 def main():
     file_to_watch = load_config()
@@ -223,11 +227,7 @@ def main():
     print("=" * 40)
     print(f"Target file: {file_to_watch}")
     
-    if not os.path.exists(file_to_watch):
-        print(f"Error: File {file_to_watch} does not exist!")
-        print(f"Please check the path in config.json")
-        input("Press Enter to exit...")
-        return
+   
 
     # Test Redis connection more thoroughly
     try:
