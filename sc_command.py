@@ -18,7 +18,6 @@ class FileWatcher(FileSystemEventHandler):
         self.last_position = self.get_file_size()
         print(f"Detected player name: {self.player_name}")
     
-        
         self.events = []  # Keep this as we still use it for tracking
         
     def get_file_size(self):
@@ -41,7 +40,7 @@ class FileWatcher(FileSystemEventHandler):
         return []
                
         
-    def save_event(self, event_type, details, timestamp=None):
+    def save_event(self, event_type, details, metadata=None, timestamp=None):
         if timestamp is None:
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             
@@ -49,7 +48,8 @@ class FileWatcher(FileSystemEventHandler):
             "timestamp": timestamp,
             "player": self.player_name,
             "type": event_type,
-            "details": details
+            "details": details,
+            "metadata": metadata
         }
         
         try:
@@ -95,7 +95,7 @@ class FileWatcher(FileSystemEventHandler):
                         self.save_event("quit", {
                             "status": "offline",
                             "player": self.player_name
-                        })
+                        }, metadata={"line": line})
                         
                     # Check for player connection
                     if "<Expect Incoming Connection>" in line:
@@ -108,14 +108,14 @@ class FileWatcher(FileSystemEventHandler):
                             self.save_event("connection", {
                                 "session": session,
                                 "player_geid": player_geid
-                            })
+                            }, metadata={"line": line})
                         except:
                             print("Failed to parse connection event")
                     
                     # Check for location updates
                     if f"Player[{self.player_name}]" in line and "Location[" in line:
                         location = line[line.find("Location["):].split("]")[0] + "]"
-                        self.save_event("location", {"location": location})
+                        self.save_event("location", {"location": location}, metadata={"line": line})
                     
                     # Check for deaths
                     if "<Actor Death>" in line and self.player_name in line:
@@ -126,13 +126,30 @@ class FileWatcher(FileSystemEventHandler):
                             
                             if self.player_name == victim:
                                 if victim == killer:
-                                    self.save_event("death", {"type": "self", "cause": damage_type})
+                                    self.save_event("death", {"type": "self", "cause": damage_type}, metadata={"line": line})
                                 else:
-                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type})
+                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type}, metadata={"line": line})
                             elif self.player_name == killer:
-                                self.save_event("kill", {"victim": victim, "cause": damage_type})
+                                self.save_event("kill", {"victim": victim, "cause": damage_type}, metadata={"line": line})
                         except:
-                            self.save_event("death", {"type": "unknown"})
+                            self.save_event("death", {"type": "unknown"}, metadata={"line": line})
+
+                     # Check for all deaths
+                    if "<Actor Death>" in line:
+                        try:
+                            victim = line.split("'")[1]
+                            killer = line.split("killed by '")[1].split("'")[0]
+                            damage_type = line.split("damage type '")[1].split("'")[0]
+                            
+                            if self.player_name == victim:
+                                if victim == killer:
+                                    self.save_event("death", {"type": "self", "cause": damage_type}, metadata={"line": line})
+                                else:
+                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type}, metadata={"line": line})
+                            elif self.player_name == killer:
+                                self.save_event("kill", {"victim": victim, "cause": damage_type}, metadata={"line": line})
+                        except:
+                            self.save_event("death", {"type": "unknown"}, metadata={"line": line})
 
 
                     # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets at least 5 chars long:
@@ -150,8 +167,9 @@ class FileWatcher(FileSystemEventHandler):
                         try:
                             ship_type = line.split("Entity [")[1].split("]")[0]
                             ship_id = ship_type.split("_")[-1]
-                            if ship_type.startswith(("AEGS", "ANVL", "CRUS", "MISC", "RSI", "ORIG")) and "_" in ship_type:
-                                r.hset("star_citizen_fleet:" + ship_id, mapping={ "id": ship_id, "name": ship_type, "owner": self.player_name, "captain": self.player_name})
+                            if ship_type.startswith(("AEGS", "ARGO", "ANVL", "CRUS", "DRAK", "MISC", "RSI", "ORIG", "MIRA")) and "_" in ship_type:
+                                timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                                r.lpush("star_citizen_fleet", mapping={ "id": ship_id, "name": ship_type, "owner": self.player_name, "captain": self.player_name, "timestamp": timestamp})
                         except:
                             pass
 
@@ -159,8 +177,8 @@ class FileWatcher(FileSystemEventHandler):
                     if "<Vehicle Destruction>" in line and "Vehicle '" in line:
                         try:
                             ship_id = line.split("Vehicle '")[1].split("'")[0].split("_")[-1]
-                            self.save_event("ship_destroyed", {"ship": ship_id})
-                            r.delete("star_citizen_fleet:" + ship_id)
+                            self.save_event("ship_destroyed", {"ship": ship_id}, metadata={"line": line})
+                            r.lrem("star_citizen_fleet", 0, id=ship_id)
                         except:
                             pass
                             
@@ -239,7 +257,7 @@ def main():
         watcher = FileWatcher(file_to_watch)
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
-        webbrowser.open('https://sc-command-web-b7no.vercel.app')
+        webbrowser.open('https://sc-command-web.vercel.app')
         print("\nPress Ctrl+C to stop...")
         
         while True:
