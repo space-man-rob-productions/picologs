@@ -143,13 +143,13 @@ class FileWatcher(FileSystemEventHandler):
                             
                             if self.player_name == victim:
                                 if victim == killer:
-                                    self.save_event("death", {"type": "self", "cause": damage_type}, metadata={"line": line})
+                                    self.save_event("nearby_death", {"type": "self", "cause": damage_type}, metadata={"line": line})
                                 else:
-                                    self.save_event("death", {"type": "killed", "killer": killer, "cause": damage_type}, metadata={"line": line})
+                                    self.save_event("nearby_death", {"type": "killed", "killer": killer, "cause": damage_type}, metadata={"line": line})
                             elif self.player_name == killer:
-                                self.save_event("kill", {"victim": victim, "cause": damage_type}, metadata={"line": line})
+                                self.save_event("nearby_kill", {"victim": victim, "cause": damage_type}, metadata={"line": line})
                         except:
-                            self.save_event("death", {"type": "unknown"}, metadata={"line": line})
+                            self.save_event("nearby_death", {"type": "unknown"}, metadata={"line": line})
 
 
                     # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets at least 5 chars long:
@@ -169,18 +169,34 @@ class FileWatcher(FileSystemEventHandler):
                             ship_id = ship_type.split("_")[-1]
                             if ship_type.startswith(("AEGS", "ARGO", "ANVL", "CRUS", "DRAK", "MISC", "RSI", "ORIG", "MIRA")) and "_" in ship_type:
                                 timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-                                r.lpush("star_citizen_fleet", mapping={ "id": ship_id, "name": ship_type, "owner": self.player_name, "captain": self.player_name, "timestamp": timestamp})
+                                ship_data = {
+                                    "id": ship_id,
+                                    "name": ship_type,
+                                    "owner": self.player_name,
+                                    "captain": self.player_name,
+                                    "timestamp": timestamp
+                                }
+                                r.lpush("star_citizen_fleet", json.dumps(ship_data))
                         except:
-                            pass
+                            print("Failed to parse ship entry event")
+                            
 
                     #<Vehicle Destruction> CVehicle::OnAdvanceDestroyLevel: Vehicle 'ORIG_m50_1725883130384'
                     if "<Vehicle Destruction>" in line and "Vehicle '" in line:
                         try:
-                            ship_id = line.split("Vehicle '")[1].split("'")[0].split("_")[-1]
+                            ship_type = line.split("Vehicle '")[1].split("'")[0]
+                            ship_id = ship_type.split("_")[-1]
                             self.save_event("ship_destroyed", {"ship": ship_id}, metadata={"line": line})
-                            r.lrem("star_citizen_fleet", 0, id=ship_id)
+                            
+                            # Get all fleet entries
+                            fleet = r.lrange("star_citizen_fleet", 0, -1)
+                            for entry in fleet:
+                                ship_data = json.loads(entry)
+                                if ship_data["id"] == ship_id:
+                                    r.lrem("star_citizen_fleet", 0, entry)
+                                    break
                         except:
-                            pass
+                            print("Failed to parse ship destruction event")
                             
         except Exception as e:
             print(f"Error reading file: {str(e)}")
