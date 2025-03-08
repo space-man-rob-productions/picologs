@@ -8,8 +8,7 @@ import sys
 import redis
 import webbrowser
 
-
-r = redis.Redis.from_url("redis://")
+r = redis.Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
@@ -150,17 +149,6 @@ class FileWatcher(FileSystemEventHandler):
                                 self.save_event("nearby_kill", {"victim": victim, "cause": damage_type}, metadata={"line": line})
                         except:
                             self.save_event("nearby_death", {"type": "unknown"}, metadata={"line": line})
-
-
-                    # 1st check for InstancedInterior and hanger inside brackets and Entity [...] [201990709919] id is in brackets at least 5 chars long:
-                    # if "InstancedInterior [" in line and "hangar" in line and "Entity [" in line and len(line.split("Entity [")[1].split("]")[0]) > 5:
-                    #     try:
-                    #         hanger_owner = line.split("m_ownerGEID[")[1].split("]")[0]
-                    #         enter_player = line.split("Entity [")[1].split("]")[0]
-                    #         if hanger_owner == self.player_name:
-                    #             self.save_event("hangar_entry", {"ship": "hangar", "owner": hanger_owner, "enter_player": enter_player})
-                    #     except:
-                    #         pass
 
                     # Check for ship entry
                     if "Entity [" in line and f"m_ownerGEID[{self.player_name}]" in line and "OnEntityEnterZone" in line:
