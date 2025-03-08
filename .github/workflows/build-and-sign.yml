@@ -14,8 +14,6 @@ permissions:
 jobs:
   build-and-sign:
     runs-on: windows-latest
-    env:
-      REDIS_URL: ${{ secrets.REDIS_URL }}
     
     steps:
     - uses: actions/checkout@v4
@@ -30,10 +28,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-        
-    - name: Create .env file
-      run: |
-        echo "REDIS_URL=${{ env.REDIS_URL }}" | Out-File -FilePath .env -Encoding UTF8
         
     - name: Build executable
       run: |

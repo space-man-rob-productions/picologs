@@ -8,7 +8,75 @@ import sys
 import redis
 import webbrowser
 
-r = redis.Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
+# Get the AppData path for configuration
+APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
+CONFIG_FILE = os.path.join(APP_DATA_PATH, 'config.json')
+
+def load_or_create_config():
+    # Create AppData directory if it doesn't exist
+    if not os.path.exists(APP_DATA_PATH):
+        os.makedirs(APP_DATA_PATH)
+    
+    # Load existing config if it exists
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    
+    # Default config
+    return {
+        'game_log_path': '',
+        'redis_url': ''
+    }
+
+def save_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=4)
+
+def prompt_for_config():
+    config = load_or_create_config()
+    
+    # Prompt for Game.log location if not set or invalid
+    default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log"
+    while not os.path.exists(config.get('game_log_path', '')):
+        print("\nPlease enter the full path to your Game.log file:")
+        print(f"(Default: {default_path})")
+        print("Press Enter to use default path")
+        
+        path = input("> ").strip()
+        if not path and os.path.exists(default_path):
+            path = default_path
+        
+        if path and os.path.exists(path):
+            config['game_log_path'] = path
+            break
+        else:
+            print("\nError: File not found at specified path!")
+    
+    # Prompt for Redis URL if not set
+    while not config.get('redis_url'):
+        print("\nPlease enter your Redis URL:")
+        print("(Format: redis://username:password@host:port)")
+        redis_url = input("> ").strip()
+        
+        # Test Redis connection
+        try:
+            test_redis = redis.Redis.from_url(redis_url)
+            test_redis.ping()
+            config['redis_url'] = redis_url
+            break
+        except Exception as e:
+            print(f"\nError connecting to Redis: {str(e)}")
+            print("Please check your Redis URL and try again")
+    
+    save_config(config)
+    return config
+
+# Initialize configuration
+config = prompt_for_config()
+r = redis.Redis.from_url(config['redis_url'])
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
@@ -203,62 +271,17 @@ class FileWatcher(FileSystemEventHandler):
             print(f"Error getting player name: {str(e)}")
             sys.exit(1)  # Exit program on error
 
-def load_config():
-    # default path
-    # C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log
-    default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log"
-    print(f"Looking for Game.log at: {default_path}")
-    
-    if not os.path.exists(default_path):
-        print("Game.log not found at default location")            
-        print("\nPlease enter the full path to your Game.log file:")
-        print("(Example: C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log)")
-        
-        while True:
-            path = input("> ").strip()
-            if os.path.exists(path):
-                return path
-            else:
-                print("\nError: File not found at specified path!")
-                print("Please enter a valid path or press Ctrl+C to exit")
-    else:
-        return default_path
-
 def main():
-    file_to_watch = load_config()
-    
     print("\nSC Command - Star Citizen Event Tracker")
     print("=" * 40)
-    print(f"Target file: {file_to_watch}")
     
-   
-
-    # Test Redis connection more thoroughly
+    config = prompt_for_config()
+    print(f"\nConfiguration loaded:")
+    print(f"Game.log: {config['game_log_path']}")
+    print(f"Redis URL: {config['redis_url'].split('@')[1] if '@' in config['redis_url'] else config['redis_url']}")  # Hide credentials
+    
     try:
-        print("Testing Redis connection...")
-        r.ping()
-        
-        # Try a test write/read
-        test_key = "sc_watcher_test"
-        test_value = "connection_test"
-        if not r.set(test_key, test_value):
-            raise Exception("Failed to write test value to Redis")
-        
-        read_value = r.get(test_key)
-        if not read_value or read_value.decode('utf-8') != test_value:
-            raise Exception("Failed to read test value from Redis")
-            
-        r.delete(test_key)
-        print("Redis connection successful!")
-        
-    except Exception as e:
-        print(f"Redis Connection Error: {str(e)}")
-        print("Please check your Redis connection")
-        input("Press Enter to exit...")
-        return
-
-    try:
-        watcher = FileWatcher(file_to_watch)
+        watcher = FileWatcher(config['game_log_path'])
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
         webbrowser.open('https://sc-command-web.vercel.app')
