@@ -35,9 +35,13 @@ jobs:
       run: |
         echo "REDIS_URL=${{ env.REDIS_URL }}" | Out-File -FilePath .env -Encoding UTF8
         
+    - name: Configure Windows Defender
+      run: |
+        Add-MpPreference -ExclusionPath ${{ github.workspace }}
+        
     - name: Build executable
       run: |
-        pyinstaller --onefile --name sc-command sc_command.py
+        pyinstaller --onefile --name sc-command --clean --win-private-assemblies --uac-admin sc_command.py
         
     - name: Azure Code Signing
       uses: azure/trusted-signing-action@v0.5.1
