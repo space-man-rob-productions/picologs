@@ -46,10 +46,12 @@ jobs:
         azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
         azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         endpoint: https://eus.codesigning.azure.net/
-        code-signing-account-name: ${{ secrets.CODE_SIGNING_ACCOUNT_NAME }}
+        trusted-signing-account-name: ${{ secrets.CODE_SIGNING_ACCOUNT_NAME }}
         certificate-profile-name: ${{ secrets.CERTIFICATE_PROFILE_NAME }}
         files-folder: 'dist'
         files-folder-filter: '*.exe'
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
