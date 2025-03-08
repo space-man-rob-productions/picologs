@@ -10,7 +10,6 @@ import webbrowser
 
 r = redis.Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
 
-
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
         self.file_path = file_path
