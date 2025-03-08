@@ -36,7 +36,7 @@ jobs:
         pyinstaller --onefile --name sc-command --add-data ".env:." sc_command.py
         
     - name: Azure Code Signing
-      uses: Azure/code-signing@v1.0.11
+      uses: azure/trusted-signing-action@v0.5.1
       with:
         azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
