@@ -31,9 +31,13 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
         
+    - name: Create .env file
+      run: |
+        echo "REDIS_URL=$env:REDIS_URL" | Out-File -FilePath .env -Encoding UTF8
+        
     - name: Build executable
       run: |
-        pyinstaller --onefile --name sc-command --add-data ".env:." sc_command.py
+        pyinstaller --onefile --name sc-command sc_command.py
         
     - name: Azure Code Signing
       uses: azure/trusted-signing-action@v0.5.1
