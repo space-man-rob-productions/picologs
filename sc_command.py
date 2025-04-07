@@ -51,27 +51,11 @@ def prompt_for_config():
         
         if path and os.path.exists(path):
             config['game_log_path'] = path
+            save_config(config)  # Save the config after updating it
             break
         else:
             print("\nError: File not found at specified path!")
     
-    # Prompt for Redis URL if not set
-    while not config.get('redis_url'):
-        print("\nPlease enter your Redis URL:")
-        print("(Format: redis://username:password@host:port)")
-        redis_url = input("> ").strip()
-        
-        # Test Redis connection
-        try:
-            test_redis = redis.Redis.from_url(redis_url)
-            test_redis.ping()
-            config['redis_url'] = redis_url
-            break
-        except Exception as e:
-            print(f"\nError connecting to Redis: {str(e)}")
-            print("Please check your Redis URL and try again")
-    
-    save_config(config)
     return config
 
 # Initialize configuration
@@ -123,11 +107,13 @@ class FileWatcher(FileSystemEventHandler):
             # Convert event to JSON string
             event_json = json.dumps(event)
             
-            # Push to Redis list
-            r.rpush("star_citizen_events", event_json)
+            # Push to REDIS JSON list
+            if not r.exists("events"):
+                r.json().set("events", "$", [])
+            r.json().arrappend("events", "$", event)
                 
         except Exception as e:
-            pass  # Silently handle errors
+            print(f"Error saving event: {str(e)}")
         
     def send_heartbeat(self):
         try:
@@ -135,6 +121,13 @@ class FileWatcher(FileSystemEventHandler):
             r.hset("sc_player_heartbeats", self.player_name, timestamp)
         except Exception as e:
             print(f"Error sending heartbeat: {str(e)}")
+
+    def send_player_claim(self):
+        try:
+            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            r.hset("player_claims", f"{self.player_name}", json.dumps(timestamp))
+        except Exception as e:
+            print(f"Error sending player claim: {str(e)}")
             
     def check_file(self):
         self.send_heartbeat()
@@ -232,7 +225,9 @@ class FileWatcher(FileSystemEventHandler):
                                     "captain": self.player_name,
                                     "timestamp": timestamp
                                 }
-                                r.lpush("star_citizen_fleet", json.dumps(ship_data))
+                                if not r.exists("fleet"):
+                                    r.json().set("fleet", "$", [])
+                                r.json().arrappend("fleet", "$", ship_data)
                         except:
                             print("Failed to parse ship entry event")
                             
@@ -243,14 +238,7 @@ class FileWatcher(FileSystemEventHandler):
                             ship_type = line.split("Vehicle '")[1].split("'")[0]
                             ship_id = ship_type.split("_")[-1]
                             self.save_event("ship_destroyed", {"ship": ship_id}, metadata={"line": line})
-                            
-                            # Get all fleet entries
-                            fleet = r.lrange("star_citizen_fleet", 0, -1)
-                            for entry in fleet:
-                                ship_data = json.loads(entry)
-                                if ship_data["id"] == ship_id:
-                                    r.lrem("star_citizen_fleet", 0, entry)
-                                    break
+                            r.json().delete('fleet', f"$[?(@.id == \"{ship_id}\")]")
                         except:
                             print("Failed to parse ship destruction event")
                             
@@ -277,14 +265,13 @@ def main():
     
     config = prompt_for_config()
     print(f"\nConfiguration loaded:")
-    print(f"Game.log: {config['game_log_path']}")
-    print(f"Redis URL: {config['redis_url'].split('@')[1] if '@' in config['redis_url'] else config['redis_url']}")  # Hide credentials
-    
+    print(f"Game.log: {config['game_log_path']}")    
     try:
         watcher = FileWatcher(config['game_log_path'])
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
-        webbrowser.open('https://sc-command-web.vercel.app')
+        watcher.send_player_claim()
+        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}')
         print("\nPress Ctrl+C to stop...")
         
         while True:
