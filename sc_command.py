@@ -63,12 +63,26 @@ def prompt_for_config():
 
 # Initialize configuration
 config = prompt_for_config()
-redis_url = os.getenv('REDIS_URL') or os.getenv('GITHUB_REDIS_URL')
+
+# Try to get Redis URL in order of priority:
+# 1. Environment variable (for built executable)
+# 2. .env file (for development)
+# 3. GitHub secret (for CI/CD)
+redis_url = os.getenv('REDIS_URL')  # First try direct environment variable
+if not redis_url:
+    redis_url = os.getenv('GITHUB_REDIS_URL')  # Then try GitHub secret
 if not redis_url:
     print("Error: REDIS_URL not found in environment variables!")
-    print("Please set either REDIS_URL in .env file or GITHUB_REDIS_URL as a GitHub secret")
+    print("Please ensure REDIS_URL is set in your environment")
     sys.exit(1)
-r = redis.Redis.from_url(redis_url)
+
+try:
+    r = redis.Redis.from_url(redis_url)
+    # Test the connection
+    r.ping()
+except Exception as e:
+    print(f"Error connecting to Redis: {str(e)}")
+    sys.exit(1)
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
