@@ -33,7 +33,7 @@ jobs:
         
     - name: Build executable
       run: |
-        pyinstaller --onefile --name sc-command sc_command.py
+        python build.py
         
     - name: Azure Code Signing
       uses: azure/trusted-signing-action@v0.5.1
