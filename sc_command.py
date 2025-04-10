@@ -16,6 +16,10 @@ load_dotenv()
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
 CONFIG_FILE = os.path.join(APP_DATA_PATH, 'config.json')
 
+# Redis URL - This will be replaced during build process
+# For development, it will use the environment variable
+REDIS_URL = os.getenv('REDIS_URL', "REPLACE_WITH_REDIS_URL")
+
 def load_or_create_config():
     # Create AppData directory if it doesn't exist
     if not os.path.exists(APP_DATA_PATH):
@@ -64,24 +68,17 @@ def prompt_for_config():
 # Initialize configuration
 config = prompt_for_config()
 
-# Try to get Redis URL in order of priority:
-# 1. Environment variable (for built executable)
-# 2. .env file (for development)
-# 3. GitHub secret (for CI/CD)
-redis_url = os.getenv('REDIS_URL')  # First try direct environment variable
-if not redis_url:
-    redis_url = os.getenv('GITHUB_REDIS_URL')  # Then try GitHub secret
-if not redis_url:
-    print("Error: REDIS_URL not found in environment variables!")
-    print("Please ensure REDIS_URL is set in your environment")
-    sys.exit(1)
+# Ensure URL has the correct scheme
+if not REDIS_URL.startswith(('redis://', 'rediss://')):
+    REDIS_URL = 'redis://' + REDIS_URL
 
 try:
-    r = redis.Redis.from_url(redis_url)
+    r = redis.Redis.from_url(REDIS_URL)
     # Test the connection
     r.ping()
 except Exception as e:
     print(f"Error connecting to Redis: {str(e)}")
+    print("Please ensure REDIS_URL is set in your environment or .env file")
     sys.exit(1)
 
 class FileWatcher(FileSystemEventHandler):
