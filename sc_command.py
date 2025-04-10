@@ -138,6 +138,7 @@ class FileWatcher(FileSystemEventHandler):
         try:
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             r.hset("sc_player_heartbeats", self.player_name, timestamp)
+            r.execute_command('HEXPIRE', "sc_player_heartbeats", 60, "FIELDS", 1, self.player_name)
         except Exception as e:
             print(f"Error sending heartbeat: {str(e)}")
 
@@ -145,6 +146,7 @@ class FileWatcher(FileSystemEventHandler):
         try:
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             r.hset("player_claims", f"{self.player_name}", json.dumps(timestamp))
+            r.expire("player_claims", 60)
         except Exception as e:
             print(f"Error sending player claim: {str(e)}")
             
@@ -296,7 +298,7 @@ def main():
         while True:
             try:
                 watcher.check_file()  # This now includes heartbeat check
-                time.sleep(5)
+                time.sleep(30)  # Reduced from 5 to 30 seconds
             except redis.RedisError as e:
                 print(f"Redis Error during check: {str(e)}")
                 time.sleep(30)  # Wait longer on Redis error
