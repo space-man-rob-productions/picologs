@@ -86,6 +86,7 @@ class FileWatcher(FileSystemEventHandler):
         self.file_path = file_path
         self.player_name = self.get_player_name()
         self.last_position = self.get_file_size()
+        self.last_change_time = 0  # Initialize last change time
         print(f"Detected player name: {self.player_name}")
     
         self.events = []  # Keep this as we still use it for tracking
@@ -136,9 +137,15 @@ class FileWatcher(FileSystemEventHandler):
         
     def send_heartbeat(self):
         try:
-            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-            r.hset("sc_player_heartbeats", self.player_name, timestamp)
-            r.execute_command('HEXPIRE', "sc_player_heartbeats", 60, "FIELDS", 1, self.player_name)
+            current_time = time.time()
+            time_since_last_change = current_time - self.last_change_time
+            
+            if time_since_last_change <= 30:
+                timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                r.hset("sc_player_heartbeats", self.player_name, timestamp)
+                r.execute_command('HEXPIRE', "sc_player_heartbeats", 60, "FIELDS", 1, self.player_name)
+            else:
+                print("No heartbeat sent - file unchanged for too long")
         except Exception as e:
             print(f"Error sending heartbeat: {str(e)}")
 
@@ -151,8 +158,6 @@ class FileWatcher(FileSystemEventHandler):
             print(f"Error sending player claim: {str(e)}")
             
     def check_file(self):
-        self.send_heartbeat()
-            
         try:
             current_size = os.path.getsize(self.file_path)
             if current_size < self.last_position:
@@ -160,7 +165,13 @@ class FileWatcher(FileSystemEventHandler):
                 self.last_position = 0
                 
             if current_size == self.last_position:
+                # Send heartbeat if we're within the 30-second window
+                self.send_heartbeat()
                 return
+                
+            # Update last change time when we detect new content
+            self.last_change_time = time.time()
+            self.send_heartbeat()  # Send heartbeat after detecting changes
                 
             # print(f"Reading file from position {self.last_position} to {current_size}")
             with open(self.file_path, 'r', encoding='utf-8', errors='ignore') as file:

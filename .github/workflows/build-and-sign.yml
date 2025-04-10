@@ -60,7 +60,7 @@ jobs:
   release:
     needs: build-and-sign
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/alpha')
     
     steps:
     - name: Download artifact
@@ -79,6 +79,5 @@ jobs:
         prerelease: false
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
-      if: startsWith(github.ref, 'refs/tags/v')
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
