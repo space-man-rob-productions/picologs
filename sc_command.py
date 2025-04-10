@@ -7,6 +7,10 @@ import datetime
 import sys
 import redis
 import webbrowser
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
@@ -27,8 +31,7 @@ def load_or_create_config():
     
     # Default config
     return {
-        'game_log_path': '',
-        'redis_url': ''
+        'game_log_path': ''
     }
 
 def save_config(config):
@@ -60,7 +63,12 @@ def prompt_for_config():
 
 # Initialize configuration
 config = prompt_for_config()
-r = redis.Redis.from_url(config['redis_url'])
+redis_url = os.getenv('REDIS_URL') or os.getenv('GITHUB_REDIS_URL')
+if not redis_url:
+    print("Error: REDIS_URL not found in environment variables!")
+    print("Please set either REDIS_URL in .env file or GITHUB_REDIS_URL as a GitHub secret")
+    sys.exit(1)
+r = redis.Redis.from_url(redis_url)
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
