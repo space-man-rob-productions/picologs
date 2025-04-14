@@ -3,7 +3,7 @@ name: Build and Sign Executable
 on:
   push:
     tags:
-      - 'v*'  # Only trigger on version tags like v1.0.0, v2.3.4, etc.
+      - '*'  # Only trigger on tags
 
 permissions:
   contents: write
