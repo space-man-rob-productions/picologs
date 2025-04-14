@@ -2,12 +2,8 @@ name: Build and Sign Executable
 
 on:
   push:
-    branches: [ main ]
     tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+      - 'v*'  # Only trigger on version tags like v1.0.0, v2.3.4, etc.
 
 permissions:
   contents: write
@@ -60,7 +56,6 @@ jobs:
   release:
     needs: build-and-sign
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
 
     steps:
     - name: Download artifact
