@@ -91,8 +91,8 @@ def check_version():
             print(f"WARNING: A new version is available!")
             print(f"Current version: {VERSION}")
             print(f"Latest version: {latest_version.decode('utf-8')}")
-            print("Please download the latest version from https://github.com/yourusername/sc-command-app/releases")
-            webbrowser.open("https://github.com/space-man-rob-productions/sc-command-app/releases")
+            print("Please download the latest version from https://github.com/space-man-rob-productions/sc-command-app/releases/tag")
+            webbrowser.open(f"https://github.com/space-man-rob-productions/sc-command-app/releases/tag/{latest_version.decode('utf-8')}")
             return False
         return True
     except Exception as e:
@@ -311,7 +311,6 @@ def main():
     print("\nSC Command - Star Citizen Event Tracker")
     print("=" * 40)
     print("Current version: " + VERSION)
-    print("https://github.com/space-man-rob-productions/sc-command-app/releases")
     config = prompt_for_config()
     print(f"\nConfiguration loaded:")
     print(f"Game.log: {config['game_log_path']}")    
