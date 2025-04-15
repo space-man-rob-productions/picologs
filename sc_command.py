@@ -324,7 +324,7 @@ def main():
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
         watcher.send_player_claim()
-        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}&app={VERSION}')
+        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}&version={VERSION}')
         print("\nPress Ctrl+C to stop...")
         
         while True:
