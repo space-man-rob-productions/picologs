@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Version number - This will be replaced during build process
-VERSION = os.getenv('VERSION')
+VERSION = "alpha-0.0.15"
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
@@ -88,7 +88,7 @@ def check_version():
     try:
         latest_version = r.get("version")
         if latest_version and latest_version.decode('utf-8') != VERSION:
-            print(f"\n\033[91mWARNING: A new version is available!\033[0m")
+            print(f"WARNING: A new version is available!")
             print(f"Current version: {VERSION}")
             print(f"Latest version: {latest_version.decode('utf-8')}")
             print("Please download the latest version from https://github.com/yourusername/sc-command-app/releases")
@@ -310,7 +310,7 @@ class FileWatcher(FileSystemEventHandler):
 def main():
     print("\nSC Command - Star Citizen Event Tracker")
     print("=" * 40)
-    print("\033[92mCurrent version: " + VERSION + "\033[0m")
+    print("Current version: " + VERSION)
     print("https://github.com/space-man-rob-productions/sc-command-app/releases")
     config = prompt_for_config()
     print(f"\nConfiguration loaded:")
