@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 load_dotenv()
 
+# Version number - This will be replaced during build process
+VERSION = os.getenv('VERSION')
+
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
 CONFIG_FILE = os.path.join(APP_DATA_PATH, 'config.json')
@@ -81,6 +84,21 @@ except Exception as e:
     print("Please ensure REDIS_URL is set in your environment or .env file")
     sys.exit(1)
 
+def check_version():
+    try:
+        latest_version = r.get("version")
+        if latest_version and latest_version.decode('utf-8') != VERSION:
+            print(f"\n\033[91mWARNING: A new version is available!\033[0m")
+            print(f"Current version: {VERSION}")
+            print(f"Latest version: {latest_version.decode('utf-8')}")
+            print("Please download the latest version from https://github.com/yourusername/sc-command-app/releases")
+            webbrowser.open("https://github.com/space-man-rob-productions/sc-command-app/releases")
+            return False
+        return True
+    except Exception as e:
+        print(f"Error checking version: {str(e)}")
+        return True  # Continue running even if version check fails
+
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
         self.file_path = file_path
@@ -144,8 +162,6 @@ class FileWatcher(FileSystemEventHandler):
                 timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
                 r.hset("sc_player_heartbeats", self.player_name, timestamp)
                 r.execute_command('HEXPIRE', "sc_player_heartbeats", 60, "FIELDS", 1, self.player_name)
-            else:
-                print("No heartbeat sent - file unchanged for too long")
         except Exception as e:
             print(f"Error sending heartbeat: {str(e)}")
 
@@ -294,16 +310,22 @@ class FileWatcher(FileSystemEventHandler):
 def main():
     print("\nSC Command - Star Citizen Event Tracker")
     print("=" * 40)
-    
+    print("\033[92mCurrent version: " + VERSION + "\033[0m")
+    print("https://github.com/space-man-rob-productions/sc-command-app/releases")
     config = prompt_for_config()
     print(f"\nConfiguration loaded:")
     print(f"Game.log: {config['game_log_path']}")    
     try:
+        # Check version before starting
+        if not check_version():
+            print("\nPress Enter to continue with current version, or Ctrl+C to exit...")
+            input()
+            
         watcher = FileWatcher(config['game_log_path'])
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
         watcher.send_player_claim()
-        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}')
+        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}&app={VERSION}')
         print("\nPress Ctrl+C to stop...")
         
         while True:
