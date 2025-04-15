@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Version number - This will be replaced during build process
-VERSION = "alpha-0.0.16"
+VERSION = "alpha-0.0.17"
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
