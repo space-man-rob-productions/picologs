@@ -51,7 +51,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: picologs-signed
-        path: dist/picologs-${{ secrets.VERSION}}-signed.exe
+        path: dist/picologs-${{ secrets.VERSION }}-signed.exe
 
   release:
     needs: build-and-sign
@@ -68,7 +68,7 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/picologs-${{ secrets.VERSION}}-signed.exe
+        files: dist/picologs-${{ secrets.VERSION }}-signed.exe
         generate_release_notes: true
         draft: false
         prerelease: false
