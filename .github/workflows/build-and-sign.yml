@@ -50,7 +50,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: picologs-signed
+        name: picologs-${{ secrets.VERSION }}-signed
         path: dist/picologs-${{ secrets.VERSION }}-signed.exe
 
   release:
@@ -61,7 +61,7 @@ jobs:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: picologs-signed
+        name: picologs-${{ secrets.VERSION }}-signed
         path: dist
 
     - name: Create Release
