@@ -21,16 +21,6 @@ if not redis_url.startswith(('redis://', 'rediss://')):
     redis_url = 'redis://' + redis_url
     print(f"Added redis:// scheme to URL: {redis_url}")
 
-# Get current git tag version
-try:
-    version = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0']).decode('utf-8').strip()
-    if version.startswith('v'):
-        version = version[1:]  # Remove 'v' prefix
-    print(f"Building version: {version}")
-except Exception as e:
-    print(f"Error getting git tag version: {str(e)}")
-    sys.exit(1)
-
 # Read the original file
 print("Reading sc_command.py...")
 with open('sc_command.py', 'r') as f:
