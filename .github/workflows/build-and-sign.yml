@@ -2,8 +2,8 @@ name: Build and Sign Executable
 
 on:
   push:
-    tags:
-      - '*'  # Only trigger on tags
+    branches:
+      - main
 
 permissions:
   contents: write

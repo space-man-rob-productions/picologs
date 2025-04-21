@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-# Version number - This will be replaced during build process
 VERSION = "alpha-0.0.19"
 
 # Get the AppData path for configuration
