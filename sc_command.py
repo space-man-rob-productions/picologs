@@ -16,7 +16,7 @@ load_dotenv()
 VERSION = "alpha-0.0.17"
 
 # Get the AppData path for configuration
-APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'SC-Command')
+APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), f'picologs-{VERSION}')
 CONFIG_FILE = os.path.join(APP_DATA_PATH, 'config.json')
 
 # Redis URL - This will be replaced during build process
@@ -91,7 +91,7 @@ def check_version():
             print(f"WARNING: A new version is available!")
             print(f"Current version: {VERSION}")
             print(f"Latest version: {latest_version.decode('utf-8')}")
-            print("Please download the latest version from https://github.com/space-man-rob-productions/sc-command-app/releases/tag")
+            print(f"Please download the latest version from https://github.com/space-man-rob-productions/sc-command-app/releases/tag/{latest_version.decode('utf-8')}")
             webbrowser.open(f"https://github.com/space-man-rob-productions/sc-command-app/releases/tag/{latest_version.decode('utf-8')}")
             return False
         return True
@@ -152,18 +152,6 @@ class FileWatcher(FileSystemEventHandler):
                 
         except Exception as e:
             print(f"Error saving event: {str(e)}")
-        
-    def send_heartbeat(self):
-        try:
-            current_time = time.time()
-            time_since_last_change = current_time - self.last_change_time
-            
-            if time_since_last_change <= 30:
-                timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-                r.hset("sc_player_heartbeats", self.player_name, timestamp)
-                r.execute_command('HEXPIRE', "sc_player_heartbeats", 60, "FIELDS", 1, self.player_name)
-        except Exception as e:
-            print(f"Error sending heartbeat: {str(e)}")
 
     def send_player_claim(self):
         try:
@@ -180,14 +168,8 @@ class FileWatcher(FileSystemEventHandler):
                 # print(f"File was truncated, resetting position from {self.last_position} to 0")
                 self.last_position = 0
                 
-            if current_size == self.last_position:
-                # Send heartbeat if we're within the 30-second window
-                self.send_heartbeat()
-                return
-                
             # Update last change time when we detect new content
             self.last_change_time = time.time()
-            self.send_heartbeat()  # Send heartbeat after detecting changes
                 
             # print(f"Reading file from position {self.last_position} to {current_size}")
             with open(self.file_path, 'r', encoding='utf-8', errors='ignore') as file:
@@ -308,7 +290,7 @@ class FileWatcher(FileSystemEventHandler):
             sys.exit(1)  # Exit program on error
 
 def main():
-    print("\nSC Command - Star Citizen Event Tracker")
+    print("\nPicologs - Star Citizen Event Tracker")
     print("=" * 40)
     print("Current version: " + VERSION)
     config = prompt_for_config()
@@ -324,12 +306,12 @@ def main():
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
         watcher.send_player_claim()
-        webbrowser.open(f'https://sc-command-web.vercel.app?player={watcher.player_name}&version={VERSION}')
+        webbrowser.open(f'https://picologs.com?player={watcher.player_name}&version={VERSION}')
         print("\nPress Ctrl+C to stop...")
         
         while True:
             try:
-                watcher.check_file()  # This now includes heartbeat check
+                watcher.check_file()
                 time.sleep(30)  # Reduced from 5 to 30 seconds
             except redis.RedisError as e:
                 print(f"Redis Error during check: {str(e)}")

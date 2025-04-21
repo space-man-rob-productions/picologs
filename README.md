@@ -1,8 +1,8 @@
-# sc-command-app
+# Picologs app
 
 Connect your Star Citizen logs with your teammates to see realtime updates and streamline crew operations.
 
-https://sc-command-web.vercel.app/
+https://picologs.com
 
 ## Publish new version
 

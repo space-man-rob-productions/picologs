@@ -50,8 +50,8 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sc-command-signed
-        path: dist/sc-command.exe
+        name: picologs-signed
+        path: dist/picologs-${{ secrets.VERSION}}-signed.exe
 
   release:
     needs: build-and-sign
@@ -61,14 +61,14 @@ jobs:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: sc-command-signed
+        name: picologs-signed
         path: dist
 
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/sc-command.exe
+        files: dist/picologs-${{ secrets.VERSION}}-signed.exe
         generate_release_notes: true
         draft: false
         prerelease: false
