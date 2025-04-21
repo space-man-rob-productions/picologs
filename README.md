@@ -6,6 +6,8 @@ https://picologs.com
 
 ## Publish new version
 
+Update VERSION
+
 Example:
 ```sh
 git tag v1.2.3
