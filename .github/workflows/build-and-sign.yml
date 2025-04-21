@@ -32,6 +32,7 @@ jobs:
         python build.py
       env:
         REDIS_URL: ${{ secrets.REDIS_URL }}
+        VERSION: ${{ secrets.VERSION }}
 
     - name: Azure Code Signing
       uses: azure/trusted-signing-action@v0.5.1
@@ -50,8 +51,8 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: picologs-${{ secrets.VERSION }}-signed
-        path: dist/picologs-${{ secrets.VERSION }}-signed.exe
+        name: picologs-${{ secrets.VERSION }}
+        path: dist/picologs-${{ secrets.VERSION }}.exe
 
   release:
     needs: build-and-sign
@@ -61,14 +62,14 @@ jobs:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: picologs-${{ secrets.VERSION }}-signed
+        name: picologs-${{ secrets.VERSION }}
         path: dist
 
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/picologs-${{ secrets.VERSION }}-signed.exe
+        files: dist/picologs-${{ secrets.VERSION }}.exe
         generate_release_notes: true
         draft: false
         prerelease: false
