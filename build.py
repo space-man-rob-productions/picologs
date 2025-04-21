@@ -8,7 +8,9 @@ load_dotenv()
 
 # Get Redis URL from .env file
 redis_url = os.getenv('REDIS_URL')
+version = os.getenv('VERSION')
 print(f"Got Redis URL from .env: {redis_url}")
+print(f"Got Version from .env: {version}")
 
 if not redis_url:
     print("Error: configure error")
@@ -46,7 +48,7 @@ with open('sc_command_build.py', 'w') as f:
 
 # Build the executable
 print("Building executable...")
-os.system('pyinstaller --onefile --name sc-command sc_command_build.py')
+os.system(f'pyinstaller --onefile --name picologs-{version} sc_command_build.py')
 
 # Clean up the temporary file
 print("Cleaning up...")
