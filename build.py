@@ -38,7 +38,7 @@ with open('sc_command_build.py', 'w') as f:
 
 # Build the executable
 print("Building executable...")
-os.system(f'pyinstaller --onefile --name picologs-{version} sc_command_build.py')
+os.system(f'pyinstaller --onefile --icon=pico.ico --name picologs-{version} sc_command_build.py')
 
 # Clean up the temporary file
 print("Cleaning up...")

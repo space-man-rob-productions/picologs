@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-VERSION = "alpha-0.0.19"
+VERSION = "alpha-0.0.20"
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), f'picologs-{VERSION}')
@@ -82,21 +82,6 @@ except Exception as e:
     print(f"Error connecting to Redis: {str(e)}")
     print("Please ensure REDIS_URL is set in your environment or .env file")
     sys.exit(1)
-
-def check_version():
-    try:
-        latest_version = r.get("version")
-        if latest_version and latest_version.decode('utf-8') != VERSION:
-            print(f"WARNING: A new version is available!")
-            print(f"Current version: {VERSION}")
-            print(f"Latest version: {latest_version.decode('utf-8')}")
-            print(f"Please download the latest version from https://github.com/space-man-rob-productions/sc-command-app/releases/tag/{latest_version.decode('utf-8')}")
-            webbrowser.open(f"https://github.com/space-man-rob-productions/sc-command-app/releases/tag/{latest_version.decode('utf-8')}")
-            return False
-        return True
-    except Exception as e:
-        print(f"Error checking version: {str(e)}")
-        return True  # Continue running even if version check fails
 
 class FileWatcher(FileSystemEventHandler):
     def __init__(self, file_path):
@@ -295,12 +280,7 @@ def main():
     config = prompt_for_config()
     print(f"\nConfiguration loaded:")
     print(f"Game.log: {config['game_log_path']}")    
-    try:
-        # Check version before starting
-        if not check_version():
-            print("\nPress Enter to continue with current version, or Ctrl+C to exit...")
-            input()
-            
+    try:    
         watcher = FileWatcher(config['game_log_path'])
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
