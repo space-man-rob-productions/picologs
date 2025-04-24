@@ -8,11 +8,63 @@ import sys
 import redis
 import webbrowser
 from dotenv import load_dotenv
+from win32com.client import Dispatch
+
+import winreg
+
+def find_star_citizen_path():
+    reg_paths = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+    ]
+
+    for root, path in reg_paths:
+        try:
+            with winreg.OpenKey(root, path) as key:
+                for i in range(winreg.QueryInfoKey(key)[0]):
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        with winreg.OpenKey(key, subkey_name) as subkey:
+                            try:
+                                name, _ = winreg.QueryValueEx(subkey, "DisplayName")
+                                if "Star Citizen" in name or "Roberts Space Industries" in name:
+                                    try:
+                                        install_path, _ = winreg.QueryValueEx(subkey, "InstallLocation")
+                                        return install_path
+                                    except (FileNotFoundError, OSError):
+                                        try:
+                                            uninstall_str, _ = winreg.QueryValueEx(subkey, "UninstallString")
+                                            return os.path.dirname(uninstall_str)  # Extract directory from uninstall string
+                                        except (FileNotFoundError, OSError):
+                                            return "Install path not found, but app is installed."
+                            except (FileNotFoundError, OSError):
+                                continue
+                    except (FileNotFoundError, OSError):
+                        continue
+        except (FileNotFoundError, OSError):
+            continue
+    
+    # Check common installation paths if registry search fails
+    common_paths = [
+        r"C:\Program Files\Roberts Space Industries",
+        r"C:\Program Files (x86)\Roberts Space Industries"
+    ]
+    
+    for path in common_paths:
+        if os.path.exists(path):
+            return path
+            
+    return "Star Citizen not found in registry or common locations."
+
+# Example usage
+path = find_star_citizen_path()
+print(f"Star Citizen Install Path: {path}")
 
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-VERSION = "alpha-0.0.20"
+VERSION = "alpha-0.0.21"
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), f'picologs-{VERSION}')
@@ -31,14 +83,21 @@ def load_or_create_config():
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
-                return json.load(f)
+                config = json.load(f)
+                # Ensure auto_launch is set to true if it exists
+                if 'auto_launch' in config:
+                    config['auto_launch'] = True
+                return config
         except:
             pass
     
     # Default config
     return {
-        'game_log_path': ''
+        'game_log_path': '',
+        'auto_launch': True
     }
+
+# C:\Program Files\Roberts Space Industries\RSI Launcher
 
 def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
@@ -47,28 +106,144 @@ def save_config(config):
 def prompt_for_config():
     config = load_or_create_config()
     
-    # Prompt for Game.log location if not set or invalid
-    default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log"
-    while not os.path.exists(config.get('game_log_path', '')):
-        print("\nPlease enter the full path to your Game.log file:")
-        print(f"(Default: {default_path})")
-        print("Press Enter to use default path")
+    # Get Star Citizen installation path
+    sc_path = find_star_citizen_path()
+    if sc_path == "Star Citizen not found in registry or common locations.":
+        print("\nError: Could not find Star Citizen installation!")
+        sys.exit(1)
+    
+    # Only prompt for version if not already configured
+    if not config.get('game_log_path') or not os.path.exists(config.get('game_log_path')):
+        # Prompt for LIVE/PTU selection
+        print("\nSelect Star Citizen version:")
+        print("1. LIVE (default)")
+        print("2. PTU")
+        version_choice = input("Enter choice (1 or 2): ").strip()
         
-        path = input("> ").strip()
-        if not path and os.path.exists(default_path):
-            path = default_path
+        # Default to LIVE if no input
+        version = "LIVE" if not version_choice or version_choice == "1" else "PTU"
+        game_log_path = os.path.join(sc_path, f"StarCitizen\\{version}\\Game.log")
         
-        if path and os.path.exists(path):
-            config['game_log_path'] = path
+        if os.path.exists(game_log_path):
+            config['game_log_path'] = game_log_path
+            config['version'] = version
             save_config(config)  # Save the config after updating it
-            break
         else:
-            print("\nError: File not found at specified path!")
+            print(f"\nError: Game.log not found at {game_log_path}")
+            sys.exit(1)
+
+        print("\nWould you like to automatically launch when RSI Launcher starts?")
+        print("1. Yes (default)")
+        print("2. No")
+        auto_launch = input("Enter choice (1 or 2): ").strip()
+        
+        # Default to Yes if no input
+        if auto_launch and auto_launch == "1":
+            try:
+                # Get current directory for pico.exe
+                current_exe = os.path.join(os.getcwd(), f"picologs-{VERSION}.exe")                
+                # Create dist directory if it doesn't exist
+                dist_dir = os.path.join(os.getcwd(), "dist")
+                os.makedirs(dist_dir, exist_ok=True)
+                
+                if not os.path.exists(current_exe):
+                    print(f"Warning: Source executable not found at {current_exe}")
+                    print("Please build the executable first using PyInstaller")
+                    config['auto_launch'] = False
+                    save_config(config)
+                    return config
+                                
+                sc_path = find_star_citizen_path()
+                launcher_path = os.path.join(sc_path, "RSI Launcher\\RSI Launcher.exe")
+                
+                # Create AppData directory for pico.exe
+                appdata_path = os.path.join(os.getenv('APPDATA'), 'picologs')
+                os.makedirs(appdata_path, exist_ok=True)
+                target_exe = os.path.join(appdata_path, f"picologs-{VERSION}.exe")
+                
+                # Copy current exe to AppData
+                import shutil
+                try:
+                    shutil.copy2(current_exe, target_exe)
+                except Exception as e:
+                    print(f"Error copying executable: {str(e)}")
+                    config['auto_launch'] = False
+                    save_config(config)
+                    return config
+                
+                # Create a batch file in the user's AppData
+                batch_content = f'@echo off\nstart "" "{target_exe}"\nstart "" "{launcher_path}" "%1"'
+                batch_path = os.path.join(appdata_path, 'launch_pico.bat')
+                with open(batch_path, 'w') as f:
+                    f.write(batch_content)
+                
+                # Get icon paths
+                sc_path = find_star_citizen_path()
+                launcher_path = os.path.join(sc_path, "RSI Launcher\\RSI Launcher.exe")
+                
+                # Use the current executable as the icon source
+                icon_path = os.path.join(os.getcwd(), f"picologs-{VERSION}.exe")
+                if not os.path.exists(icon_path):
+                    # Fall back to the target exe if source not found
+                    icon_path = target_exe
+                
+                # Create shortcuts in both Desktop locations
+                desktop_paths = [
+                    os.path.join(os.path.expanduser('~'), 'Desktop'),  # Regular Desktop
+                    os.path.join(os.path.expanduser('~'), 'OneDrive', 'Desktop')  # OneDrive Desktop
+                ]
+                
+                shortcuts_created = 0
+                for desktop_path in desktop_paths:
+                    if not os.path.exists(desktop_path):
+                        continue
+                        
+                    shortcut_path = os.path.join(desktop_path, 'Picologs.lnk')
+                    
+                    try:
+                        shell = Dispatch('WScript.Shell')
+                        shortcut = shell.CreateShortCut(shortcut_path)
+                        shortcut.Targetpath = batch_path
+                        shortcut.WorkingDirectory = os.path.dirname(batch_path)
+                        shortcut.IconLocation = icon_path
+                        shortcut.save()
+                        
+                        if os.path.exists(shortcut_path):
+                            shortcuts_created += 1
+                        else:
+                            print(f"Failed to create shortcut at: {shortcut_path}")
+                            
+                    except Exception as e:
+                        print(f"Error creating shortcut: {str(e)}")
+                        continue
+                
+                if shortcuts_created == 0:
+                    print("Failed to create shortcuts in any location")
+                    config['auto_launch'] = False
+                    save_config(config)
+                    return config
+                
+                # Save the version in config
+                config['version'] = VERSION
+                config['auto_launch'] = True
+                save_config(config)
+
+            except Exception as e:
+                print(f"Error configuring auto-launch: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                config['auto_launch'] = True  # Keep auto_launch as true even if there's an error
+                save_config(config)
+        else:
+            config['auto_launch'] = False
+            save_config(config)
+
+    else:
+        # If config exists, use it
+        print(f"Game.log: {config['game_log_path']}")
+        print(f"Version: {config.get('version', 'LIVE')}")
     
     return config
-
-# Initialize configuration
-config = prompt_for_config()
 
 # Ensure URL has the correct scheme
 if not REDIS_URL.startswith(('redis://', 'rediss://')):
@@ -79,8 +254,7 @@ try:
     # Test the connection
     r.ping()
 except Exception as e:
-    print(f"Error connecting to Redis: {str(e)}")
-    print("Please ensure REDIS_URL is set in your environment or .env file")
+    print(f"Error connecting")
     sys.exit(1)
 
 class FileWatcher(FileSystemEventHandler):
@@ -88,9 +262,7 @@ class FileWatcher(FileSystemEventHandler):
         self.file_path = file_path
         self.player_name = self.get_player_name()
         self.last_position = self.get_file_size()
-        self.last_change_time = 0  # Initialize last change time
-        print(f"Detected player name: {self.player_name}")
-    
+        self.last_change_time = 0  # Initialize last change time    
         self.events = []  # Keep this as we still use it for tracking
         
     def get_file_size(self):
@@ -125,10 +297,7 @@ class FileWatcher(FileSystemEventHandler):
             "metadata": metadata
         }
         
-        try:
-            # Convert event to JSON string
-            event_json = json.dumps(event)
-            
+        try:        
             # Push to REDIS JSON list
             if not r.exists("events"):
                 r.json().set("events", "$", [])
@@ -136,14 +305,6 @@ class FileWatcher(FileSystemEventHandler):
                 
         except Exception as e:
             print(f"Error saving event: {str(e)}")
-
-    def send_player_claim(self):
-        try:
-            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-            r.hset("player_claims", f"{self.player_name}", json.dumps(timestamp))
-            r.expire("player_claims", 60)
-        except Exception as e:
-            print(f"Error sending player claim: {str(e)}")
             
     def check_file(self):
         try:
@@ -277,14 +438,16 @@ def main():
     print("\nPicologs - Star Citizen Event Tracker")
     print("=" * 40)
     print("Current version: " + VERSION)
+    
+    # Check if this is first run
+    config = load_or_create_config()
+    
+    # Continue with normal operation
     config = prompt_for_config()
-    print(f"\nConfiguration loaded:")
-    print(f"Game.log: {config['game_log_path']}")    
     try:    
         watcher = FileWatcher(config['game_log_path'])
         print("\nTracking events for player:")
         print(f">>> {watcher.player_name} <<<")
-        watcher.send_player_claim()
         webbrowser.open(f'https://picologs.com?player={watcher.player_name}&version={VERSION}')
         print("\nPress Ctrl+C to stop...")
         

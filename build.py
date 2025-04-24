@@ -1,6 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
+import winreg
 
 # Load environment variables from .env file
 load_dotenv()
