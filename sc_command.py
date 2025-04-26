@@ -9,7 +9,8 @@ import redis
 import webbrowser
 from dotenv import load_dotenv
 from win32com.client import Dispatch
-
+import tkinter as tk
+from tkinter import filedialog
 import winreg
 
 def find_star_citizen_path():
@@ -57,14 +58,14 @@ def find_star_citizen_path():
             
     return "Star Citizen not found in registry or common locations."
 
-# Example usage
-path = find_star_citizen_path()
-print(f"Star Citizen Install Path: {path}")
 
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-VERSION = "alpha-0.0.21"
+VERSION = "alpha-0.0.22"
+
+# Debug flag for testing file selection dialog
+DEBUG_FORCE_FILE_SELECT = False  # Set to True to force file selection dialog
 
 # Get the AppData path for configuration
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), f'picologs-{VERSION}')
@@ -109,11 +110,18 @@ def prompt_for_config():
     # Get Star Citizen installation path
     sc_path = find_star_citizen_path()
     if sc_path == "Star Citizen not found in registry or common locations.":
-        print("\nError: Could not find Star Citizen installation!")
-        sys.exit(1)
+        print("\nCould not automatically find Star Citizen installation.")
+        print("Common installation paths:")
+        print("1. C:\\Program Files\\Roberts Space Industries")
+        print("2. C:\\Program Files (x86)\\Roberts Space Industries")
+        print("\nPlease enter the full path to your Star Citizen installation:")
+        sc_path = input("Path: ").strip()
+        if not os.path.exists(sc_path):
+            print("\nError: The specified path does not exist!")
+            sys.exit(1)
     
     # Only prompt for version if not already configured
-    if not config.get('game_log_path') or not os.path.exists(config.get('game_log_path')):
+    if not config.get('game_log_path') or not os.path.exists(config.get('game_log_path')) or DEBUG_FORCE_FILE_SELECT:
         # Prompt for LIVE/PTU selection
         print("\nSelect Star Citizen version:")
         print("1. LIVE (default)")
@@ -124,15 +132,22 @@ def prompt_for_config():
         version = "LIVE" if not version_choice or version_choice == "1" else "PTU"
         game_log_path = os.path.join(sc_path, f"StarCitizen\\{version}\\Game.log")
         
-        if os.path.exists(game_log_path):
+        if os.path.exists(game_log_path) and not DEBUG_FORCE_FILE_SELECT:
             config['game_log_path'] = game_log_path
             config['version'] = version
             save_config(config)  # Save the config after updating it
         else:
-            print(f"\nError: Game.log not found at {game_log_path}")
-            sys.exit(1)
+            if DEBUG_FORCE_FILE_SELECT:
+                print("\nDebug mode: Forcing file selection dialog...")
+            else:
+                print(f"\nCould not find Game.log at {game_log_path}")
+            print("Please select the Game.log file manually...")
+            game_log_path = select_game_log_file()
+            config['game_log_path'] = game_log_path
+            config['version'] = version
+            save_config(config)
 
-        print("\nWould you like to automatically launch when RSI Launcher starts?")
+        print("\nWould you like to automatically launch Picologs and RSI Launcher on Windows startup?")
         print("1. Yes (default)")
         print("2. No")
         auto_launch = input("Enter choice (1 or 2): ").strip()
@@ -199,6 +214,15 @@ def prompt_for_config():
                         continue
                         
                     shortcut_path = os.path.join(desktop_path, 'Picologs.lnk')
+                    
+                    # Remove existing shortcut if it exists
+                    if os.path.exists(shortcut_path):
+                        try:
+                            os.remove(shortcut_path)
+                            print(f"Removed existing shortcut at: {shortcut_path}")
+                        except Exception as e:
+                            print(f"Error removing existing shortcut: {str(e)}")
+                            continue
                     
                     try:
                         shell = Dispatch('WScript.Shell')
@@ -433,6 +457,28 @@ class FileWatcher(FileSystemEventHandler):
         except Exception as e:
             print(f"Error getting player name: {str(e)}")
             sys.exit(1)  # Exit program on error
+
+def select_game_log_file():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    
+    # Set initial directory to Star Citizen path if available
+    initial_dir = find_star_citizen_path()
+    if initial_dir == "Star Citizen not found in registry or common locations.":
+        initial_dir = None
+    
+    # Show file dialog
+    file_path = filedialog.askopenfilename(
+        title="Select Star Citizen Game.log",
+        initialdir=initial_dir,
+        filetypes=[("Log files", "*.log"), ("All files", "*.*")]
+    )
+    
+    if not file_path:
+        print("\nNo file selected. Exiting...")
+        sys.exit(1)
+        
+    return file_path
 
 def main():
     print("\nPicologs - Star Citizen Event Tracker")
