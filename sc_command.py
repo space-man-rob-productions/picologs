@@ -62,7 +62,7 @@ def find_star_citizen_path():
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-VERSION = "alpha-0.0.22"
+VERSION = "alpha-0.0.23"
 
 # Debug flag for testing file selection dialog
 DEBUG_FORCE_FILE_SELECT = False  # Set to True to force file selection dialog
@@ -95,7 +95,8 @@ def load_or_create_config():
     # Default config
     return {
         'game_log_path': '',
-        'auto_launch': True
+        'auto_launch': True,
+        'sc_path': ''  # Add Star Citizen path to default config
     }
 
 # C:\Program Files\Roberts Space Industries\RSI Launcher
@@ -119,6 +120,10 @@ def prompt_for_config():
         if not os.path.exists(sc_path):
             print("\nError: The specified path does not exist!")
             sys.exit(1)
+    
+    # Store the path in config
+    config['sc_path'] = sc_path
+    save_config(config)
     
     # Only prompt for version if not already configured
     if not config.get('game_log_path') or not os.path.exists(config.get('game_log_path')) or DEBUG_FORCE_FILE_SELECT:
@@ -168,7 +173,8 @@ def prompt_for_config():
                     save_config(config)
                     return config
                                 
-                sc_path = find_star_citizen_path()
+                # Use the stored path from config
+                sc_path = config['sc_path']
                 launcher_path = os.path.join(sc_path, "RSI Launcher\\RSI Launcher.exe")
                 
                 # Create AppData directory for pico.exe
@@ -192,8 +198,8 @@ def prompt_for_config():
                 with open(batch_path, 'w') as f:
                     f.write(batch_content)
                 
-                # Get icon paths
-                sc_path = find_star_citizen_path()
+                # Get icon paths - use stored path from config
+                sc_path = config['sc_path']
                 launcher_path = os.path.join(sc_path, "RSI Launcher\\RSI Launcher.exe")
                 
                 # Use the current executable as the icon source
@@ -462,8 +468,9 @@ def select_game_log_file():
     root = tk.Tk()
     root.withdraw()  # Hide the main window
     
-    # Set initial directory to Star Citizen path if available
-    initial_dir = find_star_citizen_path()
+    # Load config to get stored path
+    config = load_or_create_config()
+    initial_dir = config.get('sc_path', find_star_citizen_path())
     if initial_dir == "Star Citizen not found in registry or common locations.":
         initial_dir = None
     
