@@ -62,13 +62,13 @@ def find_star_citizen_path():
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-VERSION = "alpha-0.0.23"
+VERSION = "alpha-0.0.24"
 
 # Debug flag for testing file selection dialog
 DEBUG_FORCE_FILE_SELECT = False  # Set to True to force file selection dialog
 
 # Get the AppData path for configuration
-APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), f'picologs-{VERSION}')
+APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), 'picologs')
 CONFIG_FILE = os.path.join(APP_DATA_PATH, 'config.json')
 
 # Redis URL - This will be replaced during build process
@@ -108,22 +108,26 @@ def save_config(config):
 def prompt_for_config():
     config = load_or_create_config()
     
-    # Get Star Citizen installation path
-    sc_path = find_star_citizen_path()
-    if sc_path == "Star Citizen not found in registry or common locations.":
-        print("\nCould not automatically find Star Citizen installation.")
-        print("Common installation paths:")
-        print("1. C:\\Program Files\\Roberts Space Industries")
-        print("2. C:\\Program Files (x86)\\Roberts Space Industries")
-        print("\nPlease enter the full path to your Star Citizen installation:")
-        sc_path = input("Path: ").strip()
-        if not os.path.exists(sc_path):
-            print("\nError: The specified path does not exist!")
-            sys.exit(1)
-    
-    # Store the path in config
-    config['sc_path'] = sc_path
-    save_config(config)
+    # Check if we already have a valid path in config
+    if config.get('sc_path') and os.path.exists(config['sc_path']):
+        sc_path = config['sc_path']
+    else:
+        # Get Star Citizen installation path
+        sc_path = find_star_citizen_path()
+        if sc_path == "Star Citizen not found in registry or common locations.":
+            print("\nCould not automatically find Star Citizen installation.")
+            print("Common installation paths:")
+            print("1. C:\\Program Files\\Roberts Space Industries")
+            print("2. C:\\Program Files (x86)\\Roberts Space Industries")
+            print("\nPlease enter the full path to your Star Citizen installation:")
+            sc_path = input("Path: ").strip()
+            if not os.path.exists(sc_path):
+                print("\nError: The specified path does not exist!")
+                sys.exit(1)
+        
+        # Store the path in config
+        config['sc_path'] = sc_path
+        save_config(config)
     
     # Only prompt for version if not already configured
     if not config.get('game_log_path') or not os.path.exists(config.get('game_log_path')) or DEBUG_FORCE_FILE_SELECT:
